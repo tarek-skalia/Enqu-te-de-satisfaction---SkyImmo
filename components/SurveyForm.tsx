@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   SurveyData, 
   INITIAL_DATA, 
@@ -8,7 +8,7 @@ import {
   ACCOMPANIMENT_OPTIONS, 
   ATTITUDE_OPTIONS 
 } from '../types';
-import { Button, TextArea, Icon, StickyProgressBar } from './UI';
+import { Button, TextArea, Icon, ProgressBar, GlassCard, KeyboardHint } from './UI';
 import { generateThankYouMessage } from '../services/geminiService';
 
 export const SurveyForm: React.FC = () => {
@@ -17,334 +17,357 @@ export const SurveyForm: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [aiResponse, setAiResponse] = useState<string>("");
+  const [greeting, setGreeting] = useState("Bonjour");
 
   const TOTAL_STEPS = 7; 
 
+  // --- Dynamic Greeting ---
+  useEffect(() => {
+    const hours = new Date().getHours();
+    if (hours >= 18 || hours < 5) setGreeting("Bonsoir");
+    else setGreeting("Bonjour");
+  }, []);
+
+  // --- Keyboard Navigation ---
+  // We use useCallback to keep the listener stable
+  const handleKeyOption = useCallback((e: KeyboardEvent) => {
+    if (step < 2 || step > 5) return; // Only for option steps (2,3,4,5)
+    
+    // Map keys 1-4 to index 0-3
+    const key = e.key;
+    const index = parseInt(key) - 1;
+    
+    let currentOptions: any[] = [];
+    let field: keyof SurveyData | null = null;
+
+    if (step === 2) { currentOptions = PUNCTUALITY_OPTIONS; field = 'punctuality'; }
+    else if (step === 3) { currentOptions = KNOWLEDGE_OPTIONS; field = 'knowledge'; }
+    else if (step === 4) { currentOptions = ACCOMPANIMENT_OPTIONS; field = 'accompaniment'; }
+    else if (step === 5) { currentOptions = ATTITUDE_OPTIONS; field = 'attitude'; }
+
+    if (field && currentOptions[index]) {
+      handleSelection(field, currentOptions[index].label);
+    }
+  }, [step]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyOption);
+    return () => window.removeEventListener('keydown', handleKeyOption);
+  }, [handleKeyOption]);
+
+
+  // --- Handlers ---
   const handleSelection = (field: keyof SurveyData, value: any) => {
     setData(prev => ({ ...prev, [field]: value }));
+    // Wait for animation
     setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
       setStep(prev => prev + 1);
     }, 350); 
   };
 
-  const handleChange = (field: keyof SurveyData, value: any) => {
-    setData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const nextStep = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    setStep(prev => prev + 1);
-  };
-  
-  const prevStep = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    setStep(prev => prev - 1);
-  };
-
-  const getDynamicPlaceholder = () => {
-    if (data.globalRating === 5) return "Wow ! Qu'est-ce qui a fait la différence aujourd'hui ? 🤩";
-    if (data.globalRating >= 4) return "Qu'avez-vous le plus apprécié lors de cette visite ? 🙂";
-    if (data.globalRating <= 2) return "Désolé pour cette expérience. Dites-nous ce qui n'a pas été pour qu'on corrige le tir. 🙏";
-    return "Une suggestion pour nous aider à nous améliorer ? 🤔";
-  };
-
-  const getAgentName = () => {
-    const agent = AGENTS_LIST.find(a => a.id === data.agentId);
-    return agent ? agent.name : "Unknown Agent";
-  };
-
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise(resolve => setTimeout(resolve, 800)); // UX delay
     
-    const finalData = { ...data, agentName: getAgentName() };
+    const agent = AGENTS_LIST.find(a => a.id === data.agentId);
+    const agentName = agent ? agent.name : "Unknown";
+    
+    const finalData = { ...data, agentName };
     const message = await generateThankYouMessage(finalData);
-    setAiResponse(message);
     
+    setAiResponse(message);
     setIsSubmitting(false);
     setSubmitted(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // --- Step Content ---
+  const goBack = () => setStep(prev => prev - 1);
 
-  const Step0_Intro = () => (
-    <div className="text-center animate-slide-up">
-      <div className="relative inline-block mb-10 group cursor-pointer">
-        <div className="absolute inset-0 bg-sky-500 blur-3xl opacity-30 group-hover:opacity-60 transition-opacity duration-500 animate-pulse-slow"></div>
-        <div className="bg-white/95 backdrop-blur-sm p-6 rounded-[2rem] relative shadow-[0_0_50px_rgba(255,255,255,0.2)] transform group-hover:scale-105 transition-transform duration-500 border border-white/20">
-          <div className="flex flex-col items-center justify-center w-24 h-24 bg-white rounded-2xl">
-              <Icon name="Building2" className="text-slate-900 mb-2" size={48} />
-              <span className="text-[0.7rem] font-black text-slate-900 leading-tight tracking-wider">SKYIMMO</span>
-          </div>
+  // --- Render Steps ---
+
+  const IntroStep = () => (
+    <div className="flex flex-col items-center text-center animate-fade-up px-2">
+      <div className="mb-8 relative">
+        <div className="absolute inset-0 bg-sky-200 blur-2xl opacity-20 rounded-full animate-pulse"></div>
+        <div className="relative w-20 h-20 bg-gradient-to-br from-brand-black to-slate-800 text-white rounded-2xl flex items-center justify-center shadow-2xl shadow-slate-200 rotate-3">
+          <Icon name="Building2" size={36} />
         </div>
       </div>
       
-      <h1 className="text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 tracking-tight uppercase mb-4 drop-shadow-2xl">
+      <h1 className="text-4xl md:text-5xl font-extrabold text-brand-black mb-2 tracking-tight">
         SKYIMMO
       </h1>
-      <p className="text-orange-500 font-bold tracking-[0.4em] text-xs md:text-sm uppercase mb-16 animate-pulse">
-        L'EXCELLENCE IMMOBILIÈRE
+      <p className="text-brand-accent text-[10px] md:text-xs font-bold uppercase tracking-[0.4em] mb-10">
+        L'Excellence Immobilière
+      </p>
+      
+      <h2 className="text-2xl font-bold text-slate-800 mb-4">{greeting}.</h2>
+      <p className="text-slate-500 leading-relaxed text-sm max-w-sm mx-auto mb-10">
+        Votre expérience est notre meilleure publicité. 
+        Aidez-nous à maintenir notre standard d'excellence en quelques clics.
       </p>
 
-      <div className="bg-[#1e293b]/40 backdrop-blur-xl border border-white/10 rounded-3xl p-8 max-w-lg mx-auto mb-12 shadow-2xl relative overflow-hidden group">
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-shimmer"></div>
-        <h2 className="text-2xl font-bold text-white mb-3">Votre avis est précieux</h2>
-        <p className="text-slate-300 leading-relaxed font-light">
-          Aidez-nous à façonner l'immobilier de demain en quelques clics.
-        </p>
-      </div>
-
-      <div className="max-w-xs mx-auto">
-        <Button onClick={nextStep} animatedBorder={true}>
+      <div className="w-full max-w-xs">
+        <Button onClick={() => setStep(1)}>
           Commencer l'expérience
         </Button>
       </div>
     </div>
   );
 
-  const Step1_Agent = () => (
-    <div className="w-full">
-      <h3 className="text-3xl md:text-4xl font-bold text-white mb-10 text-center drop-shadow-lg">
-        Qui vous a accompagné ?
-      </h3>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+  const AgentStep = () => (
+    <div className="w-full animate-scale-in">
+      <div className="text-center mb-8">
+        <h3 className="text-2xl font-bold text-brand-black mb-1">Votre Expert</h3>
+        <p className="text-slate-400 text-sm">Sélectionnez la personne qui vous a accompagné.</p>
+      </div>
+      
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 overflow-y-auto max-h-[50vh] md:max-h-none p-1">
         {AGENTS_LIST.map(agent => (
           <Button 
             key={agent.id}
             variant="agent" 
             selected={data.agentId === agent.id}
             onClick={() => handleSelection('agentId', agent.id)}
-            className="h-auto py-8 hover:scale-[1.03] transition-transform duration-300"
+            className="w-full"
           >
-            <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-slate-700/50 shadow-2xl mb-4 mx-auto group-hover:border-sky-500/50 transition-colors">
-              <img src={agent.image} alt={agent.name} className="w-full h-full object-cover" />
-            </div>
-            <div className="text-center">
-              <div className="font-bold text-lg text-white mb-1">{agent.name}</div>
-              <div className="text-xs text-slate-400 uppercase tracking-wider font-semibold">{agent.role}</div>
-            </div>
-          </Button>
-        ))}
-      </div>
-    </div>
-  );
-
-  const Step2_Punctuality = () => (
-    <div className="w-full max-w-lg mx-auto">
-      <h3 className="text-3xl md:text-4xl font-bold text-white mb-10 text-center drop-shadow-lg">
-        Ponctualité
-      </h3>
-      <div className="grid grid-cols-1 gap-4">
-        {PUNCTUALITY_OPTIONS.map(opt => (
-          <Button 
-            key={opt.id}
-            variant="option" 
-            selected={data.punctuality === opt.label}
-            onClick={() => handleSelection('punctuality', opt.label)}
-            className="text-lg hover:scale-[1.02]"
-          >
-            {opt.label}
-          </Button>
-        ))}
-      </div>
-    </div>
-  );
-
-  const Step3_Knowledge = () => (
-    <div className="w-full max-w-lg mx-auto">
-      <h3 className="text-3xl md:text-4xl font-bold text-white mb-10 text-center drop-shadow-lg">
-        Maîtrise du dossier
-      </h3>
-      <div className="grid grid-cols-1 gap-4">
-        {KNOWLEDGE_OPTIONS.map(opt => (
-          <Button 
-            key={opt.id}
-            variant="option" 
-            selected={data.knowledge === opt.label}
-            onClick={() => handleSelection('knowledge', opt.label)}
-            className="text-lg hover:scale-[1.02]"
-          >
-            {opt.label}
-          </Button>
-        ))}
-      </div>
-    </div>
-  );
-
-  const Step4_Accompaniment = () => (
-    <div className="w-full max-w-lg mx-auto">
-      <h3 className="text-3xl md:text-4xl font-bold text-white mb-10 text-center drop-shadow-lg">
-        Accompagnement
-      </h3>
-      <div className="grid grid-cols-1 gap-4">
-        {ACCOMPANIMENT_OPTIONS.map(opt => (
-          <Button 
-            key={opt.id}
-            variant="option" 
-            selected={data.accompaniment === opt.label}
-            onClick={() => handleSelection('accompaniment', opt.label)}
-            className="text-lg hover:scale-[1.02]"
-          >
-            {opt.label}
-          </Button>
-        ))}
-      </div>
-    </div>
-  );
-
-  const Step5_Attitude = () => (
-    <div className="w-full max-w-lg mx-auto">
-      <h3 className="text-3xl md:text-4xl font-bold text-white mb-10 text-center drop-shadow-lg">
-        Attitude & Professionnalisme
-      </h3>
-      <div className="grid grid-cols-1 gap-4">
-        {ATTITUDE_OPTIONS.map(opt => (
-          <Button 
-            key={opt.id}
-            variant="option" 
-            selected={data.attitude === opt.label}
-            onClick={() => handleSelection('attitude', opt.label)}
-            className="text-lg hover:scale-[1.02]"
-          >
-            {opt.label}
-          </Button>
-        ))}
-      </div>
-    </div>
-  );
-
-  const Step6_GlobalRating = () => (
-    <div className="text-center w-full max-w-2xl mx-auto">
-      <h3 className="text-3xl md:text-4xl font-bold text-white mb-2 drop-shadow-lg">
-        Note globale
-      </h3>
-      <p className="text-slate-400 mb-12 text-lg">Votre impression générale ?</p>
-
-      <div className="bg-slate-900/50 backdrop-blur-md border border-slate-700/50 rounded-[2rem] p-8 inline-block mb-12 shadow-xl">
-        <div className="flex justify-center gap-2 md:gap-4">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <button
-              key={star}
-              onClick={() => handleSelection('globalRating', star)}
-              className="group relative focus:outline-none transition-transform hover:scale-110 p-2"
-            >
-              <Icon
-                name="Star"
-                size={52} 
-                className={`transition-all duration-300 drop-shadow-2xl ${
-                  data.globalRating >= star 
-                    ? 'text-amber-400 fill-amber-400 animate-[wiggle_0.4s_ease-in-out]' 
-                    : 'text-slate-800 fill-slate-800/50 stroke-slate-600 group-hover:stroke-amber-500/50'
-                }`}
-              />
-               {data.globalRating >= star && (
-                 <div className="absolute inset-0 bg-amber-500/20 blur-xl rounded-full -z-10 animate-pulse"></div>
-               )}
-            </button>
-          ))}
-        </div>
-        <div className="h-8 mt-6 font-bold text-amber-400 text-xl tracking-wide">
-            {data.globalRating === 5 && "Exceptionnel ! ⭐"}
-            {data.globalRating === 4 && "Très bien ! 👍"}
-            {data.globalRating === 3 && "Correct"}
-            {data.globalRating > 0 && data.globalRating < 3 && "Peut mieux faire"}
-        </div>
-      </div>
-
-      <div className="animate-slide-up space-y-8 max-w-lg mx-auto delay-100">
-        <TextArea 
-            label="Un dernier mot ? (Optionnel)"
-            placeholder={getDynamicPlaceholder()}
-            value={data.comment}
-            onChange={(e) => handleChange('comment', e.target.value)}
-        />
-        
-        <div className="max-w-xs mx-auto">
-          <Button 
-              onClick={handleSubmit} 
-              isLoading={isSubmitting}
-              disabled={data.globalRating === 0}
-              animatedBorder={true}
-          >
-              Envoyer mon avis
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-
-  const SuccessView = () => (
-    <div className="w-full max-w-xl mx-auto px-4 py-10 text-center animate-slide-up">
-        <div className="bg-[#0f172a]/60 backdrop-blur-2xl border border-slate-700/50 rounded-[2.5rem] p-12 shadow-2xl relative overflow-hidden group">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-sky-500 via-purple-500 to-pink-500"></div>
-          
-          {/* Confetti effect background */}
-          <div className="absolute inset-0 pointer-events-none">
-             <div className="absolute top-10 left-10 w-2 h-2 bg-yellow-400 rounded-full animate-ping"></div>
-             <div className="absolute top-20 right-20 w-3 h-3 bg-purple-400 rounded-full animate-pulse"></div>
-             <div className="absolute bottom-20 left-1/2 w-2 h-2 bg-sky-400 rounded-full animate-bounce"></div>
-          </div>
-
-          <div className="w-28 h-28 bg-green-500/10 rounded-full flex items-center justify-center mx-auto text-green-400 mb-8 animate-slide-up shadow-[0_0_50px_rgba(74,222,128,0.15)] border border-green-500/20">
-            <Icon name="CheckCircle2" size={56} />
-          </div>
-          
-          <h2 className="text-4xl font-bold text-white mb-4">Merci !</h2>
-          <p className="text-slate-400 mb-10 text-lg">Votre avis a été transmis à la direction.</p>
-          
-          <div className="bg-slate-900/40 rounded-3xl p-8 border border-slate-700/50 transform transition-all hover:scale-[1.02] duration-500 relative overflow-hidden">
-             <div className="absolute top-0 right-0 p-4 opacity-10">
-               <Icon name="Quote" size={64} />
+             <img src={agent.image} alt={agent.name} className="w-full h-full object-cover" />
+             <div className="mt-2 w-full">
+               <div className="font-bold text-xs md:text-sm leading-tight text-brand-black truncate">{agent.name}</div>
+               <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold truncate">{agent.role}</div>
              </div>
-            <div className="flex items-center justify-center gap-2 text-sky-400 font-bold mb-4">
-              <Icon name="Sparkles" size={18} />
-              <span className="text-xs uppercase tracking-[0.2em]">Le mot de l'équipe</span>
-            </div>
-            <p className="text-white italic leading-relaxed font-medium text-lg relative z-10">"{aiResponse}"</p>
-          </div>
-
-          <div className="mt-12">
-            <Button variant="ghost" onClick={() => window.location.reload()} className="hover:bg-slate-800/50 rounded-full px-8">
-              Retour au début
-            </Button>
-          </div>
-        </div>
+          </Button>
+        ))}
+      </div>
     </div>
   );
 
-  if (submitted) return <SuccessView />;
-
-  return (
-    <>
-      {step > 0 && (
-          <StickyProgressBar progress={(step / (TOTAL_STEPS - 1)) * 100} />
-      )}
+  const QuestionStep = ({ 
+    title, 
+    subtitle, 
+    options, 
+    field 
+  }: { 
+    title: string; 
+    subtitle: string; 
+    options: {id: string, label: string}[]; 
+    field: keyof SurveyData;
+  }) => (
+    <div className="w-full max-w-md mx-auto animate-fade-up">
+       <div className="text-center mb-8">
+        <h3 className="text-2xl font-bold text-brand-black mb-1">{title}</h3>
+        <p className="text-slate-400 text-sm">{subtitle}</p>
+      </div>
       
-      <div className="w-full max-w-4xl mx-auto px-4 pb-12 pt-8 relative z-10">
-        {/* Navigation Back */}
-        {step > 0 && (
-             <button 
-                onClick={prevStep}
-                className="absolute top-0 left-4 md:left-0 flex items-center gap-2 text-slate-500 hover:text-white transition-colors text-sm font-bold uppercase tracking-wider bg-slate-900/30 px-4 py-2 rounded-full hover:bg-slate-800"
-             >
-                 <Icon name="ArrowLeft" size={16} />
-                 Retour
-             </button>
+      <div className="flex flex-col gap-3">
+        {options.map((opt, idx) => (
+          <Button 
+            key={opt.id}
+            variant="option" 
+            shortcut={`${idx + 1}`}
+            selected={String(data[field]) === opt.label}
+            onClick={() => handleSelection(field, opt.label)}
+          >
+            {opt.label}
+          </Button>
+        ))}
+      </div>
+      
+      <p className="mt-8 text-center text-xs text-slate-300">
+        Appuyez sur <KeyboardHint k="1-4" /> pour sélectionner
+      </p>
+    </div>
+  );
+
+  const FinalStep = () => {
+    // Determine emotion based on rating
+    const getReaction = (rating: number) => {
+        if (rating === 5) return "🤩";
+        if (rating === 4) return "😊";
+        if (rating === 3) return "😐";
+        if (rating === 2) return "😕";
+        if (rating === 1) return "😠";
+        return "";
+    };
+
+    return (
+        <div className="w-full max-w-md mx-auto text-center animate-fade-up">
+        <div className="mb-8">
+            <h3 className="text-2xl font-bold text-brand-black mb-1">Votre Verdict</h3>
+            <p className="text-slate-400 text-sm">Une note globale pour cette mission ?</p>
+        </div>
+
+        {/* Stars Container */}
+        <div className="relative mb-8 h-20 flex items-center justify-center">
+            {/* Background glow for high ratings */}
+            {data.globalRating >= 4 && (
+                <div className="absolute inset-0 bg-yellow-400/20 blur-3xl rounded-full animate-pulse"></div>
+            )}
+            
+            <div className="flex justify-center gap-1 md:gap-3 relative z-10">
+                {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                    key={star}
+                    onClick={() => setData(prev => ({ ...prev, globalRating: star }))}
+                    className="group focus:outline-none transition-transform hover:scale-110 hover:-translate-y-1 p-1"
+                >
+                    <Icon
+                    name="Star"
+                    size={40} 
+                    className={`transition-all duration-300 ${
+                        data.globalRating >= star 
+                        ? 'text-yellow-400 fill-yellow-400 drop-shadow-md' 
+                        : 'text-slate-200 fill-white stroke-slate-300 group-hover:stroke-yellow-400'
+                    }`}
+                    />
+                </button>
+                ))}
+            </div>
+        </div>
+
+        {/* Dynamic Reaction Text */}
+        <div className="h-8 mb-8 font-bold text-lg text-brand-black animate-fade-in transition-all">
+            {data.globalRating > 0 ? (
+                <span className="flex items-center justify-center gap-2">
+                    <span className="text-2xl">{getReaction(data.globalRating)}</span>
+                    {data.globalRating === 5 && "Exceptionnel !"}
+                    {data.globalRating === 4 && "Très bien !"}
+                    {data.globalRating === 3 && "Correct."}
+                    {data.globalRating < 3 && "Peut mieux faire..."}
+                </span>
+            ) : (
+                <span className="text-slate-300 text-sm font-normal">Cliquez sur une étoile</span>
+            )}
+        </div>
+
+        <div className="text-left animate-fade-in" style={{ animationDelay: '0.1s' }}>
+            <TextArea 
+            label="Un commentaire ? (Optionnel)"
+            placeholder="Racontez-nous ce qui a fait la différence..."
+            value={data.comment}
+            onChange={(e) => setData(prev => ({ ...prev, comment: e.target.value }))}
+            rows={3}
+            />
+        </div>
+
+        <div className="mt-8">
+            <Button 
+                onClick={handleSubmit} 
+                isLoading={isSubmitting}
+                disabled={data.globalRating === 0}
+            >
+                Envoyer mon avis
+            </Button>
+        </div>
+        </div>
+    );
+  };
+
+  // --- Success View ---
+  if (submitted) {
+    return (
+      <GlassCard className="max-w-md w-full mx-auto p-10 text-center animate-scale-in">
+        <div className="mb-8 relative inline-block">
+             <div className="absolute inset-0 bg-green-400 blur-2xl opacity-20 animate-pulse"></div>
+            <div className="w-20 h-20 bg-gradient-to-tr from-green-400 to-emerald-600 text-white rounded-full flex items-center justify-center mx-auto shadow-xl relative z-10">
+            <Icon name="Check" size={40} strokeWidth={3} />
+            </div>
+        </div>
+        
+        <h2 className="text-3xl font-bold text-brand-black mb-3">Merci !</h2>
+        <p className="text-slate-500 mb-8 text-sm leading-relaxed">
+          Votre avis a bien été enregistré. <br/>
+          L'équipe Skyimmo vous remercie de votre confiance.
+        </p>
+
+        {aiResponse && (
+            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 mb-8 relative text-left">
+                <Icon name="Quote" size={20} className="text-brand-accent mb-2" />
+                <p className="text-brand-black italic font-medium relative z-10 text-sm leading-relaxed">
+                    "{aiResponse}"
+                </p>
+                <div className="mt-3 flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden">
+                         {/* AI Avatar placeholder */}
+                         <img src="https://api.dicebear.com/7.x/bottts/svg?seed=SkyAI" alt="AI" />
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Assistant Skyimmo</span>
+                </div>
+            </div>
         )}
 
-        {/* Step Rendering with Key for Animation Reset */}
-        <div key={step} className="min-h-[70vh] flex flex-col justify-center items-center animate-slide-in-right">
-            {step === 0 && <Step0_Intro />}
-            {step === 1 && <Step1_Agent />}
-            {step === 2 && <Step2_Punctuality />}
-            {step === 3 && <Step3_Knowledge />}
-            {step === 4 && <Step4_Accompaniment />}
-            {step === 5 && <Step5_Attitude />}
-            {step === 6 && <Step6_GlobalRating />}
-        </div>
+        <Button variant="outline" onClick={() => window.location.reload()} className="mx-auto border-slate-200 hover:border-slate-800">
+          Nouvel Avis
+        </Button>
+      </GlassCard>
+    );
+  }
+
+  // --- Main Layout ---
+  return (
+    <div className="w-full max-w-2xl mx-auto px-4">
+      {/* Top Navigation */}
+      <div className={`flex items-center justify-between mb-6 transition-opacity duration-300 ${step === 0 ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+         <button 
+           onClick={goBack}
+           className="flex items-center gap-2 text-slate-400 hover:text-brand-black transition-colors text-xs font-bold uppercase tracking-wider group"
+         >
+           <div className="p-2 bg-white rounded-full shadow-sm border border-slate-100 group-hover:border-slate-300">
+             <Icon name="ArrowLeft" size={14} />
+           </div>
+           <span>Retour</span>
+         </button>
+         
+         <div className="text-xs font-bold text-slate-300">
+            Étape {step} <span className="text-slate-200">/ {TOTAL_STEPS - 1}</span>
+         </div>
       </div>
-    </>
+
+      {/* Main Glass Card */}
+      <GlassCard className="min-h-[500px] flex flex-col">
+         {/* Step Content Wrapper */}
+         <div className="flex-grow flex flex-col justify-center p-6 md:p-10">
+            {step === 0 && <IntroStep />}
+            {step === 1 && <AgentStep />}
+            {step === 2 && (
+                <QuestionStep 
+                    title="La Ponctualité" 
+                    subtitle="Le respect des horaires est primordial pour nous."
+                    options={PUNCTUALITY_OPTIONS}
+                    field="punctuality"
+                />
+            )}
+            {step === 3 && (
+                <QuestionStep 
+                    title="Maîtrise du Dossier" 
+                    subtitle="L'agent a-t-il su répondre à vos attentes techniques ?"
+                    options={KNOWLEDGE_OPTIONS}
+                    field="knowledge"
+                />
+            )}
+            {step === 4 && (
+                <QuestionStep 
+                    title="L'Accompagnement" 
+                    subtitle="Vous êtes-vous senti écouté et conseillé ?"
+                    options={ACCOMPANIMENT_OPTIONS}
+                    field="accompaniment"
+                />
+            )}
+            {step === 5 && (
+                <QuestionStep 
+                    title="Attitude & Image" 
+                    subtitle="Le professionnalisme était-il au rendez-vous ?"
+                    options={ATTITUDE_OPTIONS}
+                    field="attitude"
+                />
+            )}
+            {step === 6 && <FinalStep />}
+         </div>
+
+         {/* Bottom Progress Bar */}
+         {step > 0 && step < 6 && (
+            <ProgressBar progress={(step / (TOTAL_STEPS - 1)) * 100} />
+         )}
+      </GlassCard>
+    </div>
   );
 };

@@ -2,125 +2,182 @@ import React from 'react';
 import * as Icons from 'lucide-react';
 
 // --- Icons ---
-export const Icon = ({ name, className, size = 24 }: { name: string; className?: string; size?: number }) => {
+export const Icon = ({ name, className, size = 20, strokeWidth }: { name: string; className?: string; size?: number; strokeWidth?: number }) => {
   const LucideIcon = (Icons as any)[name];
   if (!LucideIcon) return null;
-  return <LucideIcon size={size} className={className} />;
+  return <LucideIcon size={size} className={className} strokeWidth={strokeWidth} />;
 };
+
+// --- Glass Card Container ---
+export const GlassCard: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
+  <div className={`relative bg-white/70 backdrop-blur-xl border border-white/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-3xl overflow-hidden transition-all duration-500 ${className}`}>
+    {children}
+  </div>
+);
+
+// --- Keyboard Hint ---
+export const KeyboardHint: React.FC<{ k: string }> = ({ k }) => (
+  <span className="hidden md:inline-flex items-center justify-center w-5 h-5 ml-2 text-[10px] font-bold text-slate-400 border border-slate-200 rounded bg-slate-50 uppercase">
+    {k}
+  </span>
+);
 
 // --- Button ---
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'ghost' | 'option' | 'agent';
+  variant?: 'primary' | 'outline' | 'option' | 'agent';
   selected?: boolean; 
   isLoading?: boolean;
-  animatedBorder?: boolean; // New prop for the requested effect
+  shortcut?: string; // Add shortcut prop
 }
 
 export const Button: React.FC<ButtonProps> = ({ 
   children, 
   variant = 'primary', 
   selected = false,
-  animatedBorder = false,
   className = '', 
   isLoading, 
   disabled,
+  shortcut,
   ...props 
 }) => {
   
-  // Special implementation for the "Moving Border" button
-  if (animatedBorder) {
+  const base = "relative overflow-hidden transition-all duration-300 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed select-none";
+
+  // 1. Primary Action (Dark Button)
+  if (variant === 'primary') {
     return (
       <button 
-        className={`relative inline-flex h-16 w-full overflow-hidden rounded-full p-[2px] focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-2 focus:ring-offset-slate-900 group ${className}`}
+        className={`${base} w-full py-4 px-8 bg-brand-black text-white text-sm font-semibold uppercase tracking-widest hover:bg-brand-accent hover:shadow-lg hover:shadow-sky-500/20 rounded-xl active:scale-[0.98] group ${className}`}
         disabled={disabled || isLoading}
         {...props}
       >
-        <span className="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#0EA5E9_0%,#6366f1_50%,#0EA5E9_100%)]" />
-        <span className="inline-flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-slate-950 px-8 py-1 text-lg font-bold text-white backdrop-blur-3xl transition-colors hover:bg-slate-900/90">
+        <div className="relative z-10 flex items-center justify-center gap-3">
           {isLoading ? (
-            <span className="flex items-center gap-2">
-              <Icon name="Loader2" className="animate-spin" size={20} />
-              <span>Traitement...</span>
-            </span>
-          ) : children}
-        </span>
+            <>
+              <Icon name="Loader2" className="animate-spin" size={16} />
+              <span>Envoi...</span>
+            </>
+          ) : (
+            <>
+              {children}
+              <Icon name="ArrowRight" className="group-hover:translate-x-1 transition-transform duration-300" size={16} />
+            </>
+          )}
+        </div>
       </button>
     );
   }
 
-  const baseStyle = "inline-flex items-center justify-center rounded-xl font-medium transition-all duration-300 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]";
-  
-  let variantStyles = "";
-  
-  if (variant === 'primary') {
-    variantStyles = "px-8 py-4 bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-400 hover:to-sky-500 text-white shadow-lg shadow-sky-500/30 text-lg font-bold w-full relative overflow-hidden";
-  } else if (variant === 'ghost') {
-    variantStyles = "px-4 py-2 text-slate-400 hover:text-white bg-transparent hover:bg-white/5 rounded-full";
-  } else if (variant === 'option') {
-    variantStyles = `
-      p-5 text-sm md:text-base h-full w-full border rounded-2xl transition-all duration-300
-      flex flex-col items-center justify-center text-center gap-3 relative overflow-hidden group
-      ${selected 
-        ? 'bg-sky-900/20 border-sky-500 text-white shadow-[0_0_20px_rgba(14,165,233,0.25)]' 
-        : 'bg-[#111827]/80 border-slate-800 text-slate-300 hover:bg-slate-800 hover:border-slate-600'
-      }
-    `;
-  } else if (variant === 'agent') {
-    variantStyles = `
-      p-3 h-full w-full border rounded-2xl transition-all duration-300
-      flex flex-col items-center gap-3 relative group
-      ${selected 
-        ? 'bg-sky-900/20 border-sky-500 text-white shadow-[0_0_15px_rgba(14,165,233,0.3)] scale-[1.02]' 
-        : 'bg-[#111827]/50 border-slate-800 text-slate-400 hover:bg-slate-800 hover:border-slate-600 hover:text-white'
-      }
-    `;
+  // 2. Outline (Secondary)
+  if (variant === 'outline') {
+    return (
+      <button 
+        className={`${base} px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-brand-black border border-slate-200 hover:border-slate-400 rounded-full flex items-center gap-2 bg-transparent hover:bg-white/50 ${className}`}
+        disabled={disabled}
+        {...props}
+      >
+        {children}
+      </button>
+    );
   }
 
-  return (
-    <button 
-      className={`${baseStyle} ${variantStyles} ${className}`}
-      disabled={disabled || isLoading}
-      {...props}
-    >
-      {selected && variant === 'option' && (
-        <div className="absolute inset-0 bg-sky-400/5 blur-xl"></div>
-      )}
-      {isLoading ? (
-        <span className="flex items-center gap-2">
-          <Icon name="Loader2" className="animate-spin" size={20} />
-          <span>Envoi...</span>
+  // 3. Option (The List Items) - Enhanced for Premium feel
+  if (variant === 'option') {
+    return (
+      <button 
+        className={`
+          ${base} w-full p-4 md:p-5 text-left rounded-xl border flex items-center justify-between group
+          ${selected 
+            ? 'bg-brand-black text-white border-brand-black shadow-lg transform scale-[1.01] z-10' 
+            : 'bg-white/50 border-slate-200 text-slate-600 hover:border-brand-accent hover:bg-white hover:text-brand-black hover:shadow-md'
+          }
+          ${className}
+        `}
+        disabled={disabled}
+        {...props}
+      >
+        <span className="flex items-center">
+          <span className={`text-sm md:text-base font-medium transition-colors ${selected ? 'text-white' : ''}`}>
+            {children}
+          </span>
         </span>
-      ) : children}
-    </button>
-  );
+        
+        <div className="flex items-center gap-3">
+          {shortcut && !selected && <KeyboardHint k={shortcut} />}
+          
+          {/* Custom Checkbox UI */}
+          <div className={`
+            w-5 h-5 rounded-full border flex items-center justify-center transition-all duration-300
+            ${selected 
+              ? 'border-white bg-white scale-110' 
+              : 'border-slate-300 group-hover:border-brand-accent'
+            }
+          `}>
+            {selected && <div className="w-2.5 h-2.5 rounded-full bg-brand-black animate-scale-in" />}
+          </div>
+        </div>
+      </button>
+    );
+  }
+
+  // 4. Agent Card
+  if (variant === 'agent') {
+    return (
+      <button 
+        className={`
+          ${base} flex flex-col items-center justify-center p-4 rounded-2xl border transition-all duration-300 h-full relative
+          ${selected 
+            ? 'bg-white border-brand-accent shadow-xl shadow-sky-100 ring-1 ring-brand-accent scale-105 z-10' 
+            : 'bg-white/60 border-slate-100 hover:border-slate-300 hover:bg-white hover:shadow-lg text-slate-500 hover:text-slate-800'
+          }
+          ${className}
+        `}
+        disabled={disabled}
+        {...props}
+      >
+        {selected && (
+          <div className="absolute top-2 right-2 text-brand-accent animate-scale-in">
+            <Icon name="CheckCircle2" size={16} />
+          </div>
+        )}
+        
+        <div className={`
+          relative w-14 h-14 md:w-16 md:h-16 mb-3 rounded-full overflow-hidden border-2 transition-all duration-300
+          ${selected ? 'border-brand-accent shadow-md' : 'border-transparent grayscale opacity-90 group-hover:grayscale-0 group-hover:opacity-100'}
+        `}>
+          {children} 
+        </div>
+        <div className="text-center w-full">
+          {/* We render title/subtitle via props logic in parent or direct mapping here */}
+        </div>
+        {/* Render rest of children (name text) */}
+        {/* We expect the text to be passed after the image in the implementation */}
+      </button>
+    );
+  }
+
+  return <button {...props}>{children}</button>;
 };
 
 // --- Textarea ---
-interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
-  label: string;
-}
-
-export const TextArea: React.FC<TextAreaProps> = ({ label, className = '', ...props }) => {
+export const TextArea: React.FC<React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label?: string }> = ({ label, ...props }) => {
   return (
-    <div className={`w-full ${className}`}>
-      <label className="block text-sm font-semibold text-white mb-2 ml-1">{label}</label>
-      <div className="relative group">
-        <div className="absolute -inset-0.5 bg-gradient-to-r from-sky-500 to-indigo-500 rounded-xl opacity-0 group-focus-within:opacity-50 transition duration-500 blur"></div>
-        <textarea
-          className="relative w-full p-4 rounded-xl border border-slate-700 bg-[#0f172a] text-white focus:border-sky-500 focus:bg-[#162032] outline-none transition-all h-32 resize-none placeholder-slate-500 font-medium text-sm"
-          {...props}
-        />
-      </div>
+    <div className="w-full group">
+      {label && <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 group-focus-within:text-brand-accent transition-colors">{label}</label>}
+      <textarea
+        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-brand-accent focus:ring-4 focus:ring-brand-accent/10 outline-none transition-all resize-none text-slate-700 placeholder-slate-400 text-sm leading-relaxed"
+        {...props}
+      />
     </div>
   );
 };
 
-// --- Progress Bar ---
-export const StickyProgressBar: React.FC<{ progress: number }> = ({ progress }) => {
+// --- Progress Bar (Slim) ---
+export const ProgressBar: React.FC<{ progress: number }> = ({ progress }) => {
   return (
-    <div className="fixed top-0 left-0 w-full h-1.5 z-50 bg-slate-900">
+    <div className="w-full h-1 bg-slate-100 mt-auto">
       <div 
-        className="h-full bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 transition-all duration-500 ease-out shadow-[0_0_15px_rgba(14,165,233,0.8)]"
+        className="h-full bg-brand-accent shadow-[0_0_10px_rgba(14,165,233,0.5)] transition-all duration-500 ease-out"
         style={{ width: `${progress}%` }}
       />
     </div>
