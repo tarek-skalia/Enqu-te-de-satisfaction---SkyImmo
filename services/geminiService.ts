@@ -1,8 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { SurveyData } from "../types";
 
-const apiKey = process.env.API_KEY || '';
-const ai = new GoogleGenAI({ apiKey });
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // Add agentName to the interface locally for the prompt
 interface SurveyDataWithAgentName extends SurveyData {
@@ -38,7 +38,7 @@ export const generateThankYouMessage = async (data: SurveyDataWithAgentName): Pr
       Le message doit être directement adressé au client ("Merci pour...").
     `;
 
-    const response = await ai.models.generateContent({
+    const response = await ai!.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
     });
